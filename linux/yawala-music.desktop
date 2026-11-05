@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Yawala Music
+Comment=Cross-platform music and audio player, part of the Yawala-Siwala ecosystem. One Flutter code base targeting Android, iOS, Linux, macOS and Windows.
+Exec=yawala-music
+TryExec=yawala-music
+Icon=com.yawalasiwala.music
+Terminal=false
+StartupWMClass=Yawala Music
+Categories=Audio;AudioVideo;Music;
