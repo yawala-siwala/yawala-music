@@ -8,7 +8,7 @@ import 'state/app_state.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  final state = MusicState(service: MusicService());
+  final state = MusicState(service: const MusicService());
   unawaited(state.reload());
   runApp(YawalaApp(state: state));
 }
