@@ -4,9 +4,10 @@ import '../../domain/model.dart';
 
 /// List row for a single Track.
 class TrackCard extends StatelessWidget {
-  const TrackCard({super.key, required this.item});
+  const TrackCard({super.key, required this.item, this.onTap});
 
   final Track item;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +18,7 @@ class TrackCard extends StatelessWidget {
         title: Text(item.displayName),
         subtitle: Text(item.subtitle),
         trailing: Text(item.meta),
+        onTap: onTap,
       ),
     );
   }

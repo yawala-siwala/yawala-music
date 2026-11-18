@@ -1,49 +1,77 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../state/app_state.dart';
-import '../widgets/music_card.dart';
-import '../widgets/music_toolbar.dart';
+import '../../state/music_player_state.dart';
+import 'library_view.dart';
+import 'player_dashboard.dart';
+import '../widgets/mini_player_bar.dart';
 
-/// Main screen of Yawala Music: toolbar, tracks list and primary action.
-class MusicHomeScreen extends StatelessWidget {
-  const MusicHomeScreen({super.key, required this.state});
+/// Shell for Yawala Music: a Material 3 navigation bar switching between
+/// the library and the player dashboard, with a mini-player docked above
+/// the navigation while browsing.
+class MusicHomeScreen extends StatefulWidget {
+  const MusicHomeScreen({
+    super.key,
+    required this.state,
+    required this.player,
+  });
 
   final MusicState state;
+  final MusicPlayerState player;
+
+  @override
+  State<MusicHomeScreen> createState() => _MusicHomeScreenState();
+}
+
+class _MusicHomeScreenState extends State<MusicHomeScreen> {
+  int _tab = 0;
 
   @override
   Widget build(BuildContext context) {
+    final player = widget.player;
     return Scaffold(
-      appBar: AppBar(title: const Text('Yawala Music')),
-      body: Column(
+      body: IndexedStack(
+        index: _tab,
         children: [
-          MusicToolbar(state: state),
-          Expanded(
-            child: ListenableBuilder(
-              listenable: state,
-              builder: (context, _) {
-                if (state.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final items = state.items.toList(growable: false);
-                if (items.isEmpty) {
-                  return const Center(
-                    child: Text('Nothing found - try a different search.'),
-                  );
-                }
-                return ListView.builder(
-                  itemCount: items.length,
-                  itemBuilder: (context, index) =>
-                      TrackCard(item: items[index]),
-                );
-              },
-            ),
+          MusicLibraryView(
+            state: widget.state,
+            player: player,
+            onOpenPlayer: () => setState(() => _tab = 1),
           ),
+          PlayerDashboard(player: player),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Play / pause',
-        onPressed: state.togglePlayback,
-        child: Icon(state.isPlaying ? Icons.pause : Icons.play_arrow),
+      bottomNavigationBar: ListenableBuilder(
+        listenable: player,
+        builder: (context, _) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_tab == 0 && player.currentTrack != null)
+                MiniPlayerBar(
+                  player: player,
+                  onOpen: () => setState(() => _tab = 1),
+                ),
+              NavigationBar(
+                selectedIndex: _tab,
+                onDestinationSelected: (index) =>
+                    setState(() => _tab = index),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.library_music_outlined),
+                    selectedIcon: Icon(Icons.library_music),
+                    label: 'Library',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.album_outlined),
+                    selectedIcon: Icon(Icons.album),
+                    label: 'Now playing',
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
