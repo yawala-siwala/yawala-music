@@ -236,7 +236,7 @@ void main() {
         native: RecordingMusicBinding(),
         random: Random(1),
       );
-      final queue = Track.seedLibrary;
+      const queue = Track.seedLibrary;
       player.loadQueue(queue);
       await player.selectTrack(0);
       player.toggleShuffle();

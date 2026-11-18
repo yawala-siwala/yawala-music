@@ -1,6 +1,8 @@
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+// Hide material_ui's own RepeatMode (animation helper) so the player's
+// repeat-mode enum from music_player_state.dart is unambiguous.
+import 'package:material_ui/material_ui.dart' hide RepeatMode;
 
 import 'package:yawala_core/yawala_core.dart';
 

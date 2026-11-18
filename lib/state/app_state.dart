@@ -20,6 +20,9 @@ class MusicState extends ChangeNotifier {
   bool get isPlaying => _isPlaying;
 
 
+  /// Every library track regardless of the active filter.
+  List<Track> get allItems => List.unmodifiable(_items);
+
   Iterable<Track> get items => _filter.isEmpty
       ? _items
       : _items.where((item) => item.matches(_filter.toLowerCase()));

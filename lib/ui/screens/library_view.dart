@@ -37,18 +37,25 @@ class MusicLibraryView extends StatelessWidget {
               child: Text('Nothing found - try a different search.'),
             );
           }
-          return ListView.builder(
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              return TrackCard(
-                item: items[index],
-                onTap: () {
-                  player.loadQueue(items);
-                  unawaited(player.selectTrack(index));
-                  onOpenPlayer?.call();
-                },
-              );
-            },
+          return Column(
+            children: [
+              MusicToolbar(state: state),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    return TrackCard(
+                      item: items[index],
+                      onTap: () {
+                        player.loadQueue(items);
+                        unawaited(player.selectTrack(index));
+                        onOpenPlayer?.call();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),
