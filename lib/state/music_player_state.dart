@@ -224,6 +224,10 @@ class MusicPlayerState extends ChangeNotifier {
   Future<void> _stopAtEndOfQueue() async {
     _isPlaying = false;
     _position = duration;
+    if (_backgroundServiceRunning) {
+      await _native.stopBackgroundService();
+      _backgroundServiceRunning = false;
+    }
     notifyListeners();
     await _syncMediaControls();
   }

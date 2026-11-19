@@ -124,9 +124,10 @@ void main() {
   });
 
   group('MusicPlayerState progression', () {
-    test('tick advances the playhead while playing', () {
+    test('tick advances the playhead while playing', () async {
       final player = MusicPlayerState(native: RecordingMusicBinding());
       player.loadQueue([_track('a', 30)]);
+      await player.selectTrack(0);
       player.seekTo(const Duration(seconds: 5));
 
       player.tick();
