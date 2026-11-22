@@ -38,6 +38,12 @@ class MusicPlayerState extends ChangeNotifier {
   bool _sessionActivated = false;
   bool _backgroundServiceRunning = false;
 
+  /// In-flight boot jobs, so rapid track switching (interleaved `play()`
+  /// calls before the first native round-trip resolves) activates the
+  /// session and starts the service exactly once instead of racing.
+  Future<void>? _sessionActivationJob;
+  Future<void>? _serviceStartJob;
+
   /// Tracks available for playback, in queue order.
   List<Track> get queue => List.unmodifiable(_queue);
 
@@ -197,6 +203,8 @@ class MusicPlayerState extends ChangeNotifier {
     }
     await _native.deactivateAudioSession();
     _sessionActivated = false;
+    _sessionActivationJob = null;
+    _serviceStartJob = null;
     notifyListeners();
   }
 
@@ -232,21 +240,31 @@ class MusicPlayerState extends ChangeNotifier {
     await _syncMediaControls();
   }
 
-  Future<void> _ensureSessionActivated() async {
+  Future<void> _ensureSessionActivated() {
     if (_sessionActivated) {
-      return;
+      return Future<void>.value();
     }
-    await _native.activateAudioSession();
-    _sessionActivated = true;
+    // Share the in-flight activation so concurrent play() calls boot once.
+    return _sessionActivationJob ??= _activateSession();
   }
 
-  Future<void> _ensureBackgroundService() async {
+  Future<void> _activateSession() async {
+    await _native.activateAudioSession();
+    _sessionActivated = true;
+    _sessionActivationJob = null;
+  }
+
+  Future<void> _ensureBackgroundService() {
     if (_backgroundServiceRunning) {
-      return;
+      return Future<void>.value();
     }
+    return _serviceStartJob ??= _startService();
+  }
+
+  Future<void> _startService() async {
     final state = await _native.startBackgroundService();
-    _backgroundServiceRunning =
-        state == MusicBackgroundServiceState.running;
+    _backgroundServiceRunning = state == MusicBackgroundServiceState.running;
+    _serviceStartJob = null;
   }
 
   Future<void> _syncMediaControls() async {

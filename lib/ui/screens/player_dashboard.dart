@@ -25,6 +25,12 @@ class PlayerDashboard extends StatefulWidget {
 class _PlayerDashboardState extends State<PlayerDashboard> {
   Timer? _ticker;
 
+  /// Position the user is currently dragging to (in seconds). While set,
+  /// the thumb follows the finger instead of the one-second playhead tick;
+  /// the seek commits on release via [Slider.onChanged]/
+  /// [Slider.onChangeEnd].
+  double? _dragSeconds;
+
   @override
   void initState() {
     super.initState();
@@ -162,22 +168,31 @@ class _PlayerDashboardState extends State<PlayerDashboard> {
   Widget _buildScrubBar(BuildContext context, MusicPlayerState player) {
     final theme = Theme.of(context).textTheme;
     final maxSeconds = player.duration.inSeconds.toDouble();
+    final shownSeconds =
+        (_dragSeconds ?? player.position.inSeconds.toDouble()).clamp(
+      0.0,
+      maxSeconds == 0 ? 1.0 : maxSeconds,
+    );
     return Column(
       children: [
         Slider(
-          value: player.position.inSeconds
-              .clamp(0, maxSeconds == 0 ? 1 : maxSeconds.toInt())
-              .toDouble(),
+          value: shownSeconds,
           max: maxSeconds == 0 ? 1 : maxSeconds,
-          onChanged: (value) =>
-              player.seekTo(Duration(seconds: value.round())),
+          onChanged: (value) => setState(() => _dragSeconds = value),
+          onChangeEnd: (value) {
+            widget.player.seekTo(Duration(seconds: value.round()));
+            setState(() => _dragSeconds = null);
+          },
         ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(formatDuration(player.position), style: theme.labelMedium),
             Text(
-              '-${formatDuration(player.duration - player.position)}',
+              formatDuration(Duration(seconds: shownSeconds.round())),
+              style: theme.labelMedium,
+            ),
+            Text(
+              '-${formatDuration(player.duration - Duration(seconds: shownSeconds.round()))}',
               style: theme.labelMedium,
             ),
           ],
