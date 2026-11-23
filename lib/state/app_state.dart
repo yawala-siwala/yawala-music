@@ -69,12 +69,13 @@ class MusicState extends ChangeNotifier {
 
   /// Full app boot: ask the platform for media-read access (when it can
   /// ask), then index the library. Platforms without the capability fall
-  /// straight through to [reload].
+  /// straight through to [reload]. The capability probe widens to `Object?`
+  /// because flow analysis cannot promote to an unrelated interface.
   Future<void> load() async {
-    final native = _native;
-    if (native is MediaLibraryIndexingBinding && !_libraryAccessRequested) {
+    final Object? capability = _native;
+    if (capability is MediaLibraryIndexingBinding && !_libraryAccessRequested) {
       _libraryAccessRequested = true;
-      _lastAccessGrant = await native.requestLibraryAccess();
+      _lastAccessGrant = await capability.requestLibraryAccess();
     }
     await reload();
   }

@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 
 import 'package:yawala_core/yawala_core.dart';
 
+import '../domain/model.dart';
+
 /// Native contract for Yawala Music.
 ///
 /// Channel: `com.yawalasiwala/music`

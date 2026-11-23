@@ -18,11 +18,15 @@ class MusicService {
   final MusicNativeBinding? _native;
 
   /// Lists the playable library, trying the native indexer first.
+  ///
+  /// The capability probe widens the binding to `Object?`: flow analysis
+  /// cannot promote a `MusicNativeBinding?` receiver to the unrelated
+  /// [MediaLibraryIndexingBinding] interface directly.
   Future<List<Track>> list() async {
     await Future<void>.delayed(const Duration(milliseconds: 250));
-    final native = _native;
-    if (native is MediaLibraryIndexingBinding) {
-      final indexed = await native.listLibrary();
+    final Object? capability = _native;
+    if (capability is MediaLibraryIndexingBinding) {
+      final indexed = await capability.listLibrary();
       if (indexed != null) {
         YawalaLog.debug('device library indexed: ${indexed.length} tracks');
         return List.unmodifiable(indexed);

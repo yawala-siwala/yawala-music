@@ -15,10 +15,9 @@ void main() {
     service: MusicService(native: native),
     native: native,
   );
-  final player = MusicPlayerState(
-    native: native,
-    playback: native is AudioPlaybackBinding ? native : null,
-  );
+  final playback =
+      native is AudioPlaybackBinding ? native as AudioPlaybackBinding : null;
+  final player = MusicPlayerState(native: native, playback: playback);
   unawaited(library.load().then((_) => player.loadQueue(library.allItems)));
   runApp(YawalaApp(state: library, player: player));
 }
