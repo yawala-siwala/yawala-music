@@ -2,16 +2,24 @@ import 'package:flutter/foundation.dart';
 
 import '../domain/model.dart';
 import '../domain/service.dart';
+import '../native/platform_bindings.dart';
 
 /// Owns the observable state of Yawala Music: filtered tracks, loading
 /// flag and app-scoped runtime flags. Widgets rebuild via notifyListeners.
 class MusicState extends ChangeNotifier {
-  MusicState({required MusicService service}) : _service = service;
+  MusicState({required MusicService service, MusicNativeBinding? native})
+      : _service = service,
+        _native = native;
 
   final MusicService _service;
+
+  /// Optional direct native access, used to ask for media-read permission
+  /// before the first index pass on platforms that support it.
+  final MusicNativeBinding? _native;
   String _filter = '';
   bool _loading = false;
   List<Track> _items = const [];
+  bool _libraryAccessRequested = false;
 
   Track? _nowPlaying;
   bool _isPlaying = false;
@@ -28,6 +36,10 @@ class MusicState extends ChangeNotifier {
       : _items.where((item) => item.matches(_filter.toLowerCase()));
 
   bool get isLoading => _loading;
+
+  /// Result of the platform library-permission request, if one was made.
+  bool? get lastLibraryAccessGrant => _lastAccessGrant;
+  bool? _lastAccessGrant;
 
   void setFilter(String value) {
     _filter = value.trim().toLowerCase();
@@ -53,5 +65,17 @@ class MusicState extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  /// Full app boot: ask the platform for media-read access (when it can
+  /// ask), then index the library. Platforms without the capability fall
+  /// straight through to [reload].
+  Future<void> load() async {
+    final native = _native;
+    if (native is MediaLibraryIndexingBinding && !_libraryAccessRequested) {
+      _libraryAccessRequested = true;
+      _lastAccessGrant = await native.requestLibraryAccess();
+    }
+    await reload();
   }
 }

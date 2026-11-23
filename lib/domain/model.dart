@@ -89,6 +89,21 @@ class Track {
   /// Absolute path, content URI or stream URL handed to the platform player.
   final String filePath;
 
+  /// Decodes the wire representation sent by native library indexers
+  /// (MediaStore on Android): `durationMs` in milliseconds and `filePath`
+  /// carrying the content URI for platform playback.
+  factory Track.fromMap(Map<Object?, Object?>? map) {
+    return Track(
+      id: (map?['id'] as String?) ?? '',
+      title: (map?['title'] as String?) ?? 'Unknown title',
+      artist: (map?['artist'] as String?) ?? 'Unknown artist',
+      album: (map?['album'] as String?) ?? 'Unknown album',
+      duration:
+          Duration(milliseconds: ((map?['durationMs'] as num?) ?? 0).toInt()),
+      filePath: (map?['filePath'] as String?) ?? '',
+    );
+  }
+
   String get displayName => title;
   String get subtitle => '$artist - $album';
   String get meta => formatDuration(duration);

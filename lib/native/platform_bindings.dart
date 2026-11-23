@@ -13,6 +13,9 @@ import 'package:yawala_core/yawala_core.dart';
 /// | `updateMediaControls` | Lock-screen / media-notification metadata | MediaSession + foreground service / MPRemoteCommandCenter | SMTC / MPRIS |
 /// | `startBackgroundService` | Background audio lifecycle | Android foreground service / iOS background-audio mode | n/a (window keeps process alive) |
 /// | `stopBackgroundService` | Stop background playback | stop service / end background task | n/a |
+/// | `listLibrary` | Index the device media library | MediaStore.Audio.Media | MPMediaQuery / filesystem scan |
+/// | `requestLibraryAccess` | Ask for media read permission | READ_MEDIA_AUDIO dialog | n/a |
+/// | `prepare`/`play`/`pause`/`seek`/`stop`/`position`/`release` | Real audio playback | MediaPlayer + AudioAttributes | platform player |
 ///
 /// Every call goes through [NativeChannelGateway] and therefore resolves to
 /// safe fallbacks instead of throwing on platforms without a handler.
@@ -77,9 +80,54 @@ abstract interface class MusicNativeBinding {
   Future<MusicBackgroundServiceState> stopBackgroundService();
 }
 
+/// Optional capability: real device library indexing (MediaStore on
+/// Android). Detected with an `is` check at the service layer, so bindings
+/// without the capability keep working unchanged.
+abstract interface class MediaLibraryIndexingBinding {
+  /// Returns the indexed device library. An empty list means the device
+  /// library is empty or read access was denied (no fake demo tracks are
+  /// substituted); `null` means the platform cannot index and the caller
+  /// should fall back to the bundled sample library.
+  Future<List<Track>?> listLibrary();
+
+  /// Asks the platform for read access to the media library. Returns the
+  /// grant result, or `null` when the platform cannot ask.
+  Future<bool?> requestLibraryAccess();
+}
+
+/// Optional capability: real platform audio playback. When present, the
+/// player state machine drives the native engine and reads wall-clock
+/// positions from it instead of advancing a simulated one-second clock.
+abstract interface class AudioPlaybackBinding {
+  /// Loads [source] (file path or content URI) and prepares the decoder;
+  /// returns whether media is ready for playback.
+  Future<bool> prepare(String source);
+
+  /// Starts or resumes playback of the prepared media.
+  Future<void> play();
+
+  /// Suspends playback, keeping the load position.
+  Future<void> pause();
+
+  /// Seeks the prepared media to [positionMs].
+  Future<void> seek(int positionMs);
+
+  /// Halts playback and rewinds to the start (media stays prepared).
+  Future<void> stop();
+
+  /// Real playback position in milliseconds, or `null` when nothing is
+  /// prepared.
+  Future<int?> position();
+
+  /// Releases the engine and its decoded resources.
+  Future<void> release();
+}
+
 /// Real implementation that speaks to the host platform over
 /// [musicChannel], mapping failures to safe fallbacks.
-class MethodChannelMusicBinding implements MusicNativeBinding {
+class MethodChannelMusicBinding
+    implements MusicNativeBinding, MediaLibraryIndexingBinding,
+        AudioPlaybackBinding {
   MethodChannelMusicBinding({MethodChannel? channel})
       : _gateway = NativeChannelGateway(
           channel: channel ?? musicChannel,
@@ -128,6 +176,60 @@ class MethodChannelMusicBinding implements MusicNativeBinding {
     final result = await _gateway.invoke<String>('stopBackgroundService');
     return musicBackgroundServiceStateFrom(result.valueOrNull);
   }
+
+  @override
+  Future<List<Track>?> listLibrary() async {
+    final result = await _gateway.invoke<List<Object?>>('listLibrary');
+    return result.fold(
+      ok: (entries) => entries == null
+          ? null
+          : <Track>[
+              for (final entry in entries)
+                if (entry is Map<Object?, Object?>) Track.fromMap(entry),
+            ],
+      err: (_, __) => null,
+    );
+  }
+
+  @override
+  Future<bool?> requestLibraryAccess() async {
+    final result = await _gateway.invoke<bool>('requestLibraryAccess');
+    return result.fold(ok: (granted) => granted, err: (_, __) => null);
+  }
+
+  @override
+  Future<bool> prepare(String source) async {
+    final result = await _gateway.invoke<bool>(
+      'prepare',
+      <String, Object?>{'source': source},
+    );
+    return result.fold(ok: (ready) => ready ?? false, err: (_, __) => false);
+  }
+
+  @override
+  Future<void> play() => _gateway.invokeVoid('play');
+
+  @override
+  Future<void> pause() => _gateway.invokeVoid('pause');
+
+  @override
+  Future<void> seek(int positionMs) {
+    return _gateway.invokeVoid('seek', <String, Object?>{
+      'positionMs': positionMs,
+    });
+  }
+
+  @override
+  Future<void> stop() => _gateway.invokeVoid('stop');
+
+  @override
+  Future<int?> position() async {
+    final result = await _gateway.invoke<int>('position');
+    return result.fold(ok: (ms) => ms, err: (_, __) => null);
+  }
+
+  @override
+  Future<void> release() => _gateway.invokeVoid('release');
 }
 
 /// No-op implementation for tests and platforms without any native host.

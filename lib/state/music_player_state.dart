@@ -23,11 +23,20 @@ class MusicPlayerState extends ChangeNotifier {
   MusicPlayerState({
     required MusicNativeBinding native,
     Random? random,
+    AudioPlaybackBinding? playback,
   })  : _native = native,
-        _random = random ?? Random();
+        _random = random ?? Random(),
+        _playback = playback;
 
   final MusicNativeBinding _native;
   final Random _random;
+
+  /// Optional real audio engine. When present (and media actually prepared),
+  /// positions come from the platform player instead of the simulated
+  /// one-second clock.
+  final AudioPlaybackBinding? _playback;
+  bool _playbackPrepared = false;
+  String? _playbackLoadedPath;
 
   List<Track> _queue = const <Track>[];
   int? _currentIndex;
@@ -73,10 +82,17 @@ class MusicPlayerState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Advances the simulated playhead. Called by the UI once per second;
-  /// auto-advances the queue when a track finishes.
+  /// Advances the playhead once per second. With a real engine attached and
+  /// media prepared, the position is read from the platform player;
+  /// otherwise the deterministic simulated clock advances by [step] (also
+  /// the fallback when the real source failed to load). Auto-advances the
+  /// queue when a track finishes.
   void tick({Duration step = const Duration(seconds: 1)}) {
     if (!_isPlaying || _currentIndex == null || _queue.isEmpty) {
+      return;
+    }
+    if (_playback != null && _playbackPrepared) {
+      unawaited(_syncRealPosition());
       return;
     }
     final track = _queue[_currentIndex!];
@@ -94,6 +110,60 @@ class MusicPlayerState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Reads the wall-clock position from the real engine and keeps the
+  /// transport (repeat modes, queue auto-advance) in sync with it.
+  Future<void> _syncRealPosition() async {
+    final binding = _playback;
+    if (binding == null) {
+      return;
+    }
+    final ms = await binding.position();
+    if (!_isPlaying || _currentIndex == null || _queue.isEmpty) {
+      return;
+    }
+    if (ms == null) {
+      // Engine lost its media (unplugged source, error): keep going on the
+      // simulated clock rather than freezing.
+      _playbackPrepared = false;
+      notifyListeners();
+      return;
+    }
+    final track = _queue[_currentIndex!];
+    final position = Duration(milliseconds: ms);
+    if (position >= track.duration) {
+      if (_repeatMode == RepeatMode.one) {
+        _position = Duration.zero;
+        await binding.seek(0);
+        notifyListeners();
+        return;
+      }
+      await next();
+      return;
+    }
+    _position = position;
+    notifyListeners();
+  }
+
+  /// Prepares/resumes the real engine for the current track. Re-prepares
+  /// only when the loaded source actually changed.
+  Future<void> _syncPlaybackEngine() async {
+    final binding = _playback;
+    final track = currentTrack;
+    if (binding == null || track == null) {
+      return;
+    }
+    if (_playbackLoadedPath == track.filePath) {
+      await binding.play();
+      return;
+    }
+    final ready = await binding.prepare(track.filePath);
+    _playbackLoadedPath = ready ? track.filePath : null;
+    _playbackPrepared = ready;
+    if (ready) {
+      await binding.play();
+    }
+  }
+
   /// Starts (or resumes) playback, syncing the audio session, the
   /// background service and the lock-screen media controls.
   Future<void> play() async {
@@ -103,6 +173,7 @@ class MusicPlayerState extends ChangeNotifier {
     await _ensureSessionActivated();
     await _ensureBackgroundService();
     _isPlaying = true;
+    await _syncPlaybackEngine();
     notifyListeners();
     await _syncMediaControls();
   }
@@ -113,6 +184,7 @@ class MusicPlayerState extends ChangeNotifier {
       return;
     }
     _isPlaying = false;
+    await _playback?.pause();
     notifyListeners();
     await _syncMediaControls();
   }
@@ -169,12 +241,16 @@ class MusicPlayerState extends ChangeNotifier {
     await play();
   }
 
-  /// Seeks the playhead, clamped to the current track's duration.
+  /// Seeks the playhead, clamped to the current track's duration. When the
+  /// real engine is prepared the seek is forwarded to the platform player.
   void seekTo(Duration position) {
     final limit = duration;
     _position = position < Duration.zero
         ? Duration.zero
         : (position > limit ? limit : position);
+    if (_playback != null && _playbackPrepared) {
+      unawaited(_playback!.seek(_position.inMilliseconds));
+    }
     notifyListeners();
   }
 
@@ -202,6 +278,9 @@ class MusicPlayerState extends ChangeNotifier {
       _backgroundServiceRunning = false;
     }
     await _native.deactivateAudioSession();
+    await _playback?.release();
+    _playbackPrepared = false;
+    _playbackLoadedPath = null;
     _sessionActivated = false;
     _sessionActivationJob = null;
     _serviceStartJob = null;
@@ -236,6 +315,7 @@ class MusicPlayerState extends ChangeNotifier {
       await _native.stopBackgroundService();
       _backgroundServiceRunning = false;
     }
+    await _playback?.stop();
     notifyListeners();
     await _syncMediaControls();
   }

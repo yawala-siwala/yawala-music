@@ -1,14 +1,34 @@
+import 'package:yawala_core/yawala_core.dart';
+
+import '../native/platform_bindings.dart';
 import 'model.dart';
 
 /// Data access for the music library.
 ///
-/// The boilerplate serves [Track.seedLibrary]; swap the implementation for a
-/// native media scanner via `platform_bindings.dart`.
+/// Resolution order for [list]:
+/// 1. real device indexing, when the injected binding implements
+///    [MediaLibraryIndexingBinding] — an empty result is reported as an
+///    empty library (no demo tracks are substituted);
+/// 2. the bundled sample library when the platform cannot index (binding
+///    without the capability, or the channel reports unsupported), so
+///    boilerplate platforms and unit tests keep working unchanged.
 class MusicService {
-  const MusicService();
+  const MusicService({MusicNativeBinding? native}) : _native = native;
 
+  final MusicNativeBinding? _native;
+
+  /// Lists the playable library, trying the native indexer first.
   Future<List<Track>> list() async {
     await Future<void>.delayed(const Duration(milliseconds: 250));
+    final native = _native;
+    if (native is MediaLibraryIndexingBinding) {
+      final indexed = await native.listLibrary();
+      if (indexed != null) {
+        YawalaLog.debug('device library indexed: ${indexed.length} tracks');
+        return List.unmodifiable(indexed);
+      }
+      YawalaLog.debug('device indexing unavailable - using sample library');
+    }
     return List.unmodifiable(Track.seedLibrary);
   }
 }

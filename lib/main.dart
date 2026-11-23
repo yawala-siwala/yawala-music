@@ -10,8 +10,15 @@ import 'state/music_player_state.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  final library = MusicState(service: const MusicService());
-  final player = MusicPlayerState(native: bootMusicNative());
-  unawaited(library.reload().then((_) => player.loadQueue(library.allItems)));
+  final native = bootMusicNative();
+  final library = MusicState(
+    service: MusicService(native: native),
+    native: native,
+  );
+  final player = MusicPlayerState(
+    native: native,
+    playback: native is AudioPlaybackBinding ? native : null,
+  );
+  unawaited(library.load().then((_) => player.loadQueue(library.allItems)));
   runApp(YawalaApp(state: library, player: player));
 }
