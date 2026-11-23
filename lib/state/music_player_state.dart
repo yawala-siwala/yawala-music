@@ -249,7 +249,7 @@ class MusicPlayerState extends ChangeNotifier {
         ? Duration.zero
         : (position > limit ? limit : position);
     if (_playback != null && _playbackPrepared) {
-      unawaited(_playback!.seek(_position.inMilliseconds));
+      unawaited(_playback.seek(_position.inMilliseconds));
     }
     notifyListeners();
   }

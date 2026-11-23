@@ -258,12 +258,12 @@ void main() {
       final native = FakeIndexingBinding()
         ..accessGrant = true
         ..library = [
-          Track(
+          const Track(
             id: 'media-1',
             title: 'Real Song',
             artist: 'Real Artist',
             album: 'Real Album',
-            duration: const Duration(seconds: 210),
+            duration: Duration(seconds: 210),
             filePath: 'content://media/external/audio/media/1',
           ),
         ];
